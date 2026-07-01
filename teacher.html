@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>This is Vocabulary · 선생님 대시보드</title>
+<meta name="theme-color" content="#241F3D">
+<link rel="stylesheet" href="styles.css">
+<style>
+  body { background: var(--bg); }
+  .tapp { max-width: 900px; margin: 0 auto; min-height: 100dvh; padding: 20px 20px 60px; }
+  .tapp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .tapp-title { font-family: var(--font-display); font-size: 22px; color: var(--coral); }
+  .teacher-tabs, .class-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .ttab {
+    padding: 9px 16px; border-radius: 999px; border: 1.5px solid var(--border-strong);
+    font-size: 13px; font-weight: 700; color: var(--ink-soft); background: var(--surface);
+  }
+  .ttab.active { background: var(--coral); color: #fff; border-color: var(--coral); }
+  .ctab.active { background: var(--purple); color: #fff; border-color: var(--purple); }
+  .t-metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 16px 0 20px; }
+  @media (max-width: 640px) { .t-metric-grid { grid-template-columns: 1fr 1fr; } }
+  .t-metric { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius-m); padding: 14px 16px; }
+  .t-metric .label { font-size: 12px; color: var(--ink-soft); font-weight: 600; }
+  .t-metric .value { font-family: var(--font-display); font-size: 24px; margin-top: 4px; }
+  .t-metric .value.danger { color: var(--danger); }
+  .day-select-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .day-select-row select { padding: 10px 14px; border-radius: var(--radius-m); border: 1.5px solid var(--border-strong); font-size: 14px; }
+  table.t-table { width: 100%; border-collapse: collapse; font-size: 13.5px; background: var(--surface); border-radius: var(--radius-m); overflow: hidden; }
+  table.t-table th, table.t-table td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--border); }
+  table.t-table th { color: var(--ink-soft); font-weight: 700; font-size: 12px; background: var(--bg); }
+  .trend-tag { display: inline-flex; align-items: center; gap: 3px; font-weight: 700; font-size: 12.5px; }
+  .trend-tag.up { color: var(--teal-dark); }
+  .trend-tag.down { color: var(--danger); }
+  .trend-tag.flat { color: var(--ink-faint); }
+  .chart-wrap { position: relative; height: 260px; margin-bottom: 22px; background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius-m); padding: 14px; }
+  .lock-screen { max-width: 360px; margin: 80px auto; padding: 28px; background: var(--surface); border-radius: var(--radius-l); text-align: center; box-shadow: var(--shadow-lift); }
+  .lock-screen input { width: 100%; padding: 13px 14px; border-radius: var(--radius-m); border: 1.5px solid var(--border-strong); font-size: 16px; text-align: center; margin: 14px 0; }
+  .section-gap { margin-top: 26px; }
+</style>
+</head>
+<body>
+
+<div id="lock" class="lock-screen">
+  <div style="font-family:var(--font-display); font-size:20px; color:var(--coral);">🔒 선생님 대시보드</div>
+  <div style="font-size:13px; color:var(--ink-soft); margin-top:6px;">비밀번호를 입력하세요</div>
+  <input id="lock-pw" type="password" placeholder="비밀번호">
+  <button id="lock-btn" class="btn btn-primary btn-block">입장하기</button>
+  <div id="lock-err" style="color:var(--danger); font-size:12.5px; margin-top:10px;"></div>
+</div>
+
+<div id="tapp" class="tapp" hidden>
+  <div class="tapp-header">
+    <div class="tapp-title">This is Vocabulary · 선생님 대시보드</div>
+  </div>
+
+  <div id="teacher-tabs" class="teacher-tabs"></div>
+  <div id="class-tabs" class="class-tabs"></div>
+
+  <div class="t-metric-grid">
+    <div class="t-metric"><div class="label">반 평균 (Day <span id="t-cur-day">-</span>)</div><div class="value" id="t-avg">-</div></div>
+    <div class="t-metric"><div class="label">참여 학생 수</div><div class="value" id="t-count">-</div></div>
+    <div class="t-metric"><div class="label">최고 점수자</div><div class="value" id="t-top" style="font-size:16px;">-</div></div>
+    <div class="t-metric"><div class="label">주의 필요</div><div class="value danger" id="t-warn">-</div></div>
+  </div>
+
+  <div class="day-select-row">
+    <span style="font-size:13px; font-weight:700; color:var(--ink-soft);">Day 선택</span>
+    <select id="day-select"></select>
+  </div>
+
+  <div class="chart-wrap"><canvas id="class-chart" role="img" aria-label="학생별 점수 막대 그래프"></canvas></div>
+
+  <div class="section-gap">
+    <table class="t-table">
+      <thead>
+        <tr>
+          <th>학생</th><th>전체 평균</th><th>최근 3회</th><th>추세</th><th>최근 응시</th><th>응시 횟수</th>
+        </tr>
+      </thead>
+      <tbody id="t-table-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="words.js"></script>
+<script src="teachers.js"></script>
+<script src="firebase-config.js"></script>
+<script src="teacher.js"></script>
+</body>
+</html>
