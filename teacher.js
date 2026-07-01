@@ -117,11 +117,11 @@ function loadClassData() {
   document.getElementById("t-count").textContent = "…";
   document.getElementById("t-top").textContent = "…";
   document.getElementById("t-warn").textContent = "…";
-  document.getElementById("t-table-body").innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--ink-faint); padding:24px;">불러오는 중...</td></tr>`;
+  document.getElementById("t-table-body").innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--ink-faint); padding:24px;">불러오는 중...</td></tr>`;
 
   fetchClassScores().then(rows => {
     if (rows === null) {
-      document.getElementById("t-table-body").innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--danger); padding:24px;">데이터를 불러오지 못했어요. Firebase 설정을 확인해주세요.</td></tr>`;
+      document.getElementById("t-table-body").innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--danger); padding:24px;">데이터를 불러오지 못했어요. Firebase 설정을 확인해주세요.</td></tr>`;
       return;
     }
     if (rows.length === 0) {
@@ -129,7 +129,7 @@ function loadClassData() {
       document.getElementById("t-count").textContent = "0명";
       document.getElementById("t-top").textContent = "-";
       document.getElementById("t-warn").textContent = "-";
-      document.getElementById("t-table-body").innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--ink-faint); padding:24px;">아직 이 반의 기록이 없어요.</td></tr>`;
+      document.getElementById("t-table-body").innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--ink-faint); padding:24px;">아직 이 반의 기록이 없어요.</td></tr>`;
       renderClassChart([]);
       return;
     }
@@ -213,9 +213,56 @@ function renderTable(students) {
       <td>${trendHtml}</td>
       <td>Day ${s.lastDay}</td>
       <td>${s.count}회</td>
+      <td><button class="btn btn-outline" style="padding:6px 12px; font-size:12px; color:var(--danger); border-color:var(--danger);" data-delname="${escapeHtmlT(s.name)}">삭제</button></td>
     `;
     tbody.appendChild(tr);
   });
+
+  tbody.querySelectorAll("[data-delname]").forEach(btn => {
+    btn.addEventListener("click", () => deleteStudent(btn.dataset.delname));
+  });
+}
+
+function toast(msg, ms = 2200) {
+  const t = document.getElementById("toast");
+  if (!t) return;
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove("show"), ms);
+}
+
+function deleteStudent(name) {
+  const t = findTeacher(curTeacherId);
+  const c = findClass(curTeacherId, curClassId);
+  const ok = confirm(`'${name}' 학생의 모든 기록(전체 Day)을 삭제할까요?\n${t.name} 선생님 · ${c.name}\n\n이 작업은 되돌릴 수 없어요.`);
+  if (!ok) return;
+
+  db.collection(SCORES_COLLECTION)
+    .where("teacherId", "==", curTeacherId)
+    .where("classId", "==", curClassId)
+    .where("name", "==", name)
+    .get()
+    .then(snap => {
+      if (snap.empty) return Promise.resolve();
+      // Firestore batch limit is 500 writes — chunk just in case
+      const docs = snap.docs;
+      const chunks = [];
+      for (let i = 0; i < docs.length; i += 400) chunks.push(docs.slice(i, i + 400));
+      return chunks.reduce((p, chunk) => p.then(() => {
+        const batch = db.batch();
+        chunk.forEach(d => batch.delete(d.ref));
+        return batch.commit();
+      }), Promise.resolve());
+    })
+    .then(() => {
+      toast(`'${name}' 학생 기록을 삭제했어요.`);
+      loadClassData();
+    })
+    .catch(err => {
+      console.error("delete student failed", err);
+      toast("⚠️ 삭제에 실패했어요. 네트워크를 확인해주세요.");
+    });
 }
 
 function escapeHtmlT(s) {
